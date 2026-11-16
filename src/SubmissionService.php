@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Database\QueryException;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SubmissionService
 {
@@ -46,18 +47,18 @@ class SubmissionService
         $decaySeconds = max(60, (int) ($options['rate_limit']['decay_seconds'] ?? 600));
 
         if (RateLimiter::tooManyAttempts($limitKey, $maxAttempts)) {
-            abort(429, 'Too many submissions. Please try again later.');
+            throw new HttpException(429, 'Too many submissions. Please try again later.');
         }
         RateLimiter::hit($limitKey, $decaySeconds);
 
         $honeypot = (string) ($options['honeypot'] ?? 'website');
         if (!empty($input[$honeypot])) {
-            abort(422, 'Unable to process this submission.');
+            throw new HttpException(422, 'Unable to process this submission.');
         }
 
         $idempotencyKey = $input['_jforms_idempotency'] ?? null;
         if (!is_string($idempotencyKey) || !preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $idempotencyKey)) {
-            abort(422, 'A valid submission key is required.');
+            throw new HttpException(422, 'A valid submission key is required.');
         }
 
         $allowed = array_keys($rules);
@@ -104,7 +105,9 @@ class SubmissionService
     public function form(string $formKey): array
     {
         $forms = config('jforms.forms', []);
-        abort_unless(isset($forms[$formKey]) && is_array($forms[$formKey]), 404);
+        if (!isset($forms[$formKey]) || !is_array($forms[$formKey])) {
+            throw new HttpException(404);
+        }
         return $forms[$formKey];
     }
 }
