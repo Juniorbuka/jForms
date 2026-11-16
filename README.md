@@ -16,7 +16,7 @@ Secure AJAX form submission and response storage for Evolution CMS 3. Build form
 Run from the Evolution CMS `core/` directory:
 
 ```sh
-php artisan package:installrequire jevo/jforms "^1.0"
+php artisan package:installrequire jevo/jforms "^1.0.0"
 php artisan migrate
 ```
 
