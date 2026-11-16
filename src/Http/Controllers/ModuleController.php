@@ -4,6 +4,8 @@ namespace Jevo\JForms\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ModuleController
@@ -21,11 +23,15 @@ class ModuleController
 
     public function show(Request $request, string $form)
     {
-        $filters = $request->validate([
+        $validator = Validator::make($request->all(), [
             'q' => ['nullable', 'string', 'max:100'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+        $filters = $request->only(['q', 'date_from', 'date_to']);
 
         $query = DB::table('jforms_responses')->where('form_key', $form);
         if (!empty($filters['q'])) {
@@ -67,10 +73,14 @@ class ModuleController
 
     public function bulkDestroy(Request $request, string $form)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['required', 'integer', 'distinct'],
         ]);
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+        $validated = ['ids' => $request->input('ids', [])];
 
         $deleted = DB::table('jforms_responses')
             ->where('form_key', $form)
