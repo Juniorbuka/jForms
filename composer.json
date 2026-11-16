@@ -1,6 +1,5 @@
 {
   "name": "jevo/jforms",
-  "version": "1.0.0",
   "description": "Secure Blade form submissions and responses for Evolution CMS",
   "type": "library",
   "license": "GPL-3.0-or-later",
@@ -15,7 +14,21 @@
   },
   "extra": {
     "laravel": {
-      "providers": ["Jevo\\JForms\\JFormsServiceProvider"]
+      "providers": [
+        "Jevo\\JForms\\JFormsServiceProvider"
+      ]
     }
+  },
+  "keywords": [
+    "evolutioncms",
+    "evo",
+    "forms",
+    "ajax",
+    "blade",
+    "jforms"
+  ],
+  "support": {
+    "issues": "https://github.com/Juniorbuka/jForms/issues",
+    "source": "https://github.com/Juniorbuka/jForms"
   }
 }
