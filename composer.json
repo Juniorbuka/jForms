@@ -1,0 +1,21 @@
+{
+  "name": "jevo/jforms",
+  "version": "1.0.0",
+  "description": "Secure Blade form submissions and responses for Evolution CMS",
+  "type": "library",
+  "license": "GPL-3.0-or-later",
+  "require": {
+    "php": "^8.3",
+    "evolution-cms/evolution": "^3.5.7"
+  },
+  "autoload": {
+    "psr-4": {
+      "Jevo\\JForms\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": ["Jevo\\JForms\\JFormsServiceProvider"]
+    }
+  }
+}
