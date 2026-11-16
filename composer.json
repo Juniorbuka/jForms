@@ -1,6 +1,6 @@
 {
   "name": "jevo/jforms",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "Secure Blade form submissions and responses for Evolution CMS",
   "type": "library",
   "license": "GPL-3.0-or-later",
