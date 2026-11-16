@@ -5,6 +5,7 @@ use Jevo\JForms\Http\Controllers\ModuleController;
 
 Route::name('jForms.')->group(function (): void {
     Route::get('/', [ModuleController::class, 'index'])->name('index');
+    Route::post('/{form}/responses/bulk-delete', [ModuleController::class, 'bulkDestroy'])->name('bulkDestroy');
     Route::get('/{form}', [ModuleController::class, 'show'])->name('show');
     Route::get('/{form}/responses/{response}', [ModuleController::class, 'response'])
         ->whereNumber('response')

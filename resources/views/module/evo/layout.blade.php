@@ -35,6 +35,12 @@
         .evo-ui-jforms__detail .evo-ui-jforms__data{grid-template-columns:1fr}
         .evo-ui-jforms__detail .evo-ui-jforms__field{grid-template-columns:minmax(130px,.35fr) 1fr;align-items:center}
         .evo-ui-jforms__notice{margin-bottom:14px;padding:12px 14px;border:1px solid var(--evo-ui-border);border-radius:var(--evo-ui-radius);background:var(--evo-ui-surface)}
+        .evo-ui-jforms__filters{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin-bottom:14px;padding:15px;background:var(--evo-ui-surface);border:1px solid var(--evo-ui-border);border-radius:var(--evo-ui-radius)}
+        .evo-ui-jforms__filters label{display:grid;gap:5px;color:var(--evo-ui-muted);font-size:12px;font-weight:600}
+        .evo-ui-jforms__search{flex:1;min-width:220px}.evo-ui-jforms__search input{width:100%}
+        .evo-ui-jforms__bulk{display:flex;align-items:center;gap:12px;margin:0 0 12px}.evo-ui-jforms__bulk>label,.evo-ui-jforms__select{display:inline-flex;align-items:center;gap:8px}
+        .evo-ui-jforms__select input,.evo-ui-jforms__bulk input{accent-color:var(--evo-ui-primary)}
+        .evo-ui-jforms__response-head .evo-ui-jforms__select{margin-right:auto}.evo-ui-jforms__pagination{margin-top:18px;overflow-x:auto}
         @media(max-width:680px){.evo-ui-jforms{padding:16px}.evo-ui-jforms__form-link{grid-template-columns:auto minmax(0,1fr) auto}.evo-ui-jforms__form-date{grid-column:2;text-align:left}.evo-ui-jforms__form-arrow{display:none}.evo-ui-jforms__detail .evo-ui-jforms__field{grid-template-columns:1fr}}
     </style>
 </head>

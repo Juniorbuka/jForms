@@ -19,14 +19,29 @@ class ModuleController
         return $this->renderModuleView('forms_list', compact('responses'));
     }
 
-    public function show(string $form)
+    public function show(Request $request, string $form)
     {
-        $responses = DB::table('jforms_responses')
-            ->where('form_key', $form)
-            ->orderByDesc('id')
-            ->paginate(50);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'date_from' => ['nullable', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
+        ]);
 
-        return $this->renderModuleView('form_results', compact('form', 'responses'));
+        $query = DB::table('jforms_responses')->where('form_key', $form);
+        if (!empty($filters['q'])) {
+            $term = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $filters['q']);
+            $query->where('data', 'like', '%' . $term . '%');
+        }
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        $responses = $query->orderByDesc('created_at')->orderByDesc('id')->paginate(25)->withQueryString();
+
+        return $this->renderModuleView('form_results', compact('form', 'responses', 'filters'));
     }
 
     public function response(string $form, int $response)
@@ -48,6 +63,21 @@ class ModuleController
     {
         DB::table('jforms_responses')->where('id', $id)->delete();
         return redirect()->back()->with('status', __('jForms::module.deleted'));
+    }
+
+    public function bulkDestroy(Request $request, string $form)
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['required', 'integer', 'distinct'],
+        ]);
+
+        $deleted = DB::table('jforms_responses')
+            ->where('form_key', $form)
+            ->whereIn('id', $validated['ids'])
+            ->delete();
+
+        return redirect()->back()->with('status', trans('jForms::module.deleted_count', ['count' => $deleted]));
     }
 
     private function renderModuleView(string $view, array $data)
