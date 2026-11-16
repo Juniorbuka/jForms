@@ -31,7 +31,7 @@
             </div>
             <form method="post" action="{{ route('jForms.destroy', ['id' => $result->id]) }}" onsubmit="return confirm(@json(__('jForms::module.confirm_delete')))">
                 @csrf
-                @method('DELETE')
+                <input type="hidden" name="_method" value="DELETE">
                 <button class="btn btn-danger btn-sm" type="submit">
                     @svg('tabler-trash', '', ['width' => 16, 'height' => 16, 'aria-hidden' => 'true'])
                     {{ __('jForms::module.delete') }}
