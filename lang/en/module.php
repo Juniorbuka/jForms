@@ -2,6 +2,9 @@
 
 return [
     'title' => 'Form responses',
+    'forms_description' => 'Browse submitted data for each form.',
+    'responses_description' => 'Submitted responses for this form.',
+    'response_data' => 'Response data',
     'form' => 'Form',
     'count' => 'Responses',
     'latest' => 'Latest response',
