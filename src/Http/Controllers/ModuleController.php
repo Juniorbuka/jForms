@@ -4,6 +4,7 @@ namespace Jevo\JForms\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class ModuleController
 {
@@ -35,7 +36,9 @@ class ModuleController
             ->where('id', $response)
             ->first();
 
-        abort_unless($result, 404);
+        if (!$result) {
+            throw new HttpException(404);
+        }
         $fields = json_decode($result->data, true) ?: [];
 
         return view('jForms::module.form_result', compact('form', 'result', 'fields'));
