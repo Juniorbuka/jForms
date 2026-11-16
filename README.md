@@ -1,78 +1,48 @@
+[README.md](https://github.com/user-attachments/files/34906904/README.md)
 # jForms
 
-Secure AJAX submission and response storage for Evolution CMS 3. Forms are ordinary Blade/HTML markup; field allowlists and Laravel validation rules are configured on the server.
+Secure AJAX form submission and response storage for Evolution CMS 3. Build forms with ordinary Blade/HTML, define validation rules in your controller, and let jForms validate and store responses as JSON.
 
-## Install
+[Українська версія](#українська)
 
-From `core/`, install the Composer package, then migrate:
+## Requirements
+
+- Evolution CMS `^3.5.7`
+- PHP `^8.3`
+- Composer
+
+## Installation
+
+Run from the Evolution CMS `core/` directory:
 
 ```sh
 php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 ```
 
-## Configure a form
+The migration creates the `jforms_responses` table. The manager module **Form responses / Відповіді форм** lists forms with responses and lets authorized manager users browse and delete submissions.
 
-Copy `config/jforms.php` to `core/custom/config/jforms.php`, then define form keys and server-side rules under `forms`. Only keys listed in `rules` are retained. Example:
+To publish the default configuration to `core/custom/config/jforms.php`:
 
-```php
-'callback' => [
-    'name' => 'Зворотний дзвінок',
-    'rules' => ['phone' => ['required', 'string', 'max:40']],
-    'honeypot' => 'website',
-    'rate_limit' => ['attempts' => 5, 'decay_seconds' => 600],
-],
+```sh
+php artisan vendor:publish --tag=jforms-config
 ```
 
-## Blade form
+File uploads are not supported.
 
-Render ordinary fields and post JSON to `route('jForms.submit', ['form' => 'callback'])`. Include Laravel's CSRF token in a header or form field. The request must accept JSON; successful responses return `{ "ok": true, "message": "..." }` and validation errors use Laravel's JSON error response.
+## Controller
 
-```blade
-<form id="callback-form">
-    @csrf
-    <input type="tel" name="phone" required>
-    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="d-none">
-    <button type="submit">Надіслати</button>
-</form>
-<script>
-document.querySelector('#callback-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const body = Object.fromEntries(new FormData(form).entries());
-    const key = form.dataset.submissionKey || crypto.randomUUID();
-    form.dataset.submissionKey = key;
-    const response = await fetch(@json(route('jForms.submit', ['form' => 'callback'])), {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-            'Idempotency-Key': key,
-        },
-        body: JSON.stringify(body),
-    });
-    const result = await response.json();
-    if (response.ok) {
-        form.reset();
-        delete form.dataset.submissionKey;
-    }
-    // Render result/errors with textContent in the site's UI.
-});
-</script>
-```
-
-For a controller-owned form, put the validation rules in the controller and delegate validation/storage to jForms:
+Register a POST route inside the `web` middleware group so CSRF protection applies. Keep form names and validation rules in trusted PHP code; never accept them from the request.
 
 ```php
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 use Jevo\JForms\SubmissionService;
 
-public function submitAppointment(Request $request, SubmissionService $jForms)
-{
+Route::middleware('web')->post('/appointment', function (Request $request, SubmissionService $jForms) {
     $result = $jForms->submitDefinition(
         'appointment',
-        'Запис на прийом',
+        'Appointment request',
         array_replace($request->all(), [
             '_jforms_idempotency' => $request->header('Idempotency-Key'),
         ]),
@@ -82,13 +52,101 @@ public function submitAppointment(Request $request, SubmissionService $jForms)
             'child_name' => ['nullable', 'string', 'max:120'],
         ],
         (string) $request->ip(),
-        ['success_message' => 'Дякуємо! Ми зв’яжемося з вами.']
+        [
+            'honeypot' => 'website',
+            'rate_limit' => ['attempts' => 5, 'decay_seconds' => 600],
+            'success_message' => 'Thank you. We will contact you soon.',
+        ]
     );
 
     return response()->json(['ok' => true] + $result, 201);
-}
+});
 ```
 
-Register that controller action as a POST route inside the `web` middleware group. The Blade template remains ordinary HTML, and the rules/options must be trusted PHP code. This reuses jForms rate limiting, duplicate submission protection, and storage.
+`submitDefinition()` validates only fields listed in the server rules, discards other request keys, rate-limits submissions by IP and form, checks a honeypot, prevents duplicate submissions using `Idempotency-Key`, and stores validated values in JSON. Validation errors return Laravel's JSON response with status `422`.
 
-Uploads are not supported. Responses are stored in the `jforms_responses` table and can be reviewed in the manager module **Відповіді форм**.
+## Blade form and AJAX
+
+```blade
+<form id="appointment-form">
+    @csrf
+    <input type="tel" name="phone" required>
+    <input type="email" name="email">
+    <input type="text" name="child_name">
+    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="d-none">
+    <button type="submit">Send</button>
+    <p id="appointment-message" aria-live="polite"></p>
+</form>
+<script>
+document.querySelector('#appointment-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const key = form.dataset.submissionKey || crypto.randomUUID();
+    form.dataset.submissionKey = key;
+    const response = await fetch('/appointment', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
+            'Idempotency-Key': key,
+        },
+        body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
+    });
+    const result = await response.json();
+    const message = document.querySelector('#appointment-message');
+    message.textContent = response.ok ? result.message : Object.values(result.errors || {}).flat().join(' ');
+    if (response.ok) {
+        form.reset();
+        delete form.dataset.submissionKey;
+    }
+});
+</script>
+```
+
+Use `textContent` when displaying server responses. Serve the site over HTTPS so `crypto.randomUUID()` is available.
+
+## License
+
+GNU General Public License v3.0 or later. See [LICENSE](LICENSE).
+
+---
+
+# Українська
+
+`jForms` — пакет для AJAX-відправлення Blade-форм і збереження відповідей у JSON для Evolution CMS 3. Розмітку форми пишіть звичайним Blade/HTML, правила перевірки задавайте у контролері.
+
+## Вимоги
+
+- Evolution CMS `^3.5.7`
+- PHP `^8.3`
+- Composer
+
+## Встановлення
+
+Виконайте команди з каталогу `core/` Evolution CMS:
+
+```sh
+php artisan package:installrequire jevo/jforms "^1.0"
+php artisan migrate
+```
+
+Міграція створює таблицю `jforms_responses`. У менеджері з’явиться модуль **«Відповіді форм» / “Form responses”**. Він показує форми з відповідями, дозволяє переглядати їх і видаляти відповідно до прав менеджера.
+
+Щоб опублікувати стандартну конфігурацію в `core/custom/config/jforms.php`:
+
+```sh
+php artisan vendor:publish --tag=jforms-config
+```
+
+Завантаження файлів поки не підтримується.
+
+## Контролер і Blade
+
+Зареєструйте POST-маршрут у middleware-групі `web`, щоб діяла CSRF-перевірка. Назву форми й правила валідації задавайте в довіреному PHP-коді сервера, а не в запиті браузера. Приклади контролера та Blade/AJAX-форми наведені в англійській секції вище.
+
+`submitDefinition()` перевіряє лише поля, задані сервером, відкидає інші ключі запиту, обмежує частоту відправлень за IP та формою, перевіряє honeypot і захищає від повторного збереження за `Idempotency-Key`. Валідовані дані записуються у JSON. Помилки валідації повертаються у JSON зі статусом `422`.
+
+## Ліцензія
+
+GNU General Public License версії 3 або новішої. Повний текст — у файлі [LICENSE](LICENSE).
