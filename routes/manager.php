@@ -9,5 +9,5 @@ Route::name('jForms.')->group(function (): void {
     Route::get('/{form}/responses/{response}', [ModuleController::class, 'response'])
         ->whereNumber('response')
         ->name('response');
-    Route::delete('/responses/{id}', [ModuleController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    Route::post('/responses/{id}', [ModuleController::class, 'destroy'])->whereNumber('id')->name('destroy');
 });
