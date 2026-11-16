@@ -1,9 +1,10 @@
-[README.md](https://github.com/user-attachments/files/34906904/README.md)
 # jForms
 
-Secure AJAX form submission and response storage for Evolution CMS 3. Build forms with ordinary Blade/HTML, define validation rules in your controller, and let jForms validate and store responses as JSON.
+Secure AJAX form submission and response storage for Evolution CMS 3. Build forms with ordinary Blade/HTML, define validation rules in trusted server-side configuration or controller code, and let jForms validate and store responses as JSON.
 
 [Українська версія](#українська)
+
+Usage guides: [English](docs/en/usage.md) · [Українська](docs/uk/usage.md)
 
 ## Requirements
 
@@ -16,13 +17,13 @@ Secure AJAX form submission and response storage for Evolution CMS 3. Build form
 Run from the Evolution CMS `core/` directory:
 
 ```sh
-php artisan package:installrequire jevo/jforms "^1.0.0"
+php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 ```
 
-The migration creates the `jforms_responses` table. The manager module **Form responses / Відповіді форм** lists forms with responses and lets authorized manager users browse and delete submissions.
+The migration creates the `jforms_responses` table. The manager module **Form responses / Відповіді форм** lists forms with responses and lets authorized manager users browse and delete submissions. When Evo UI is installed, the module uses its manager theme and components; otherwise, it uses the built-in Blade interface.
 
-To publish the default configuration to `core/custom/config/jforms.php`:
+To publish the default configuration to `core/custom/config/jevo/jforms.php`:
 
 ```sh
 php artisan vendor:publish --tag=jforms-config
@@ -114,7 +115,9 @@ GNU General Public License v3.0 or later. See [LICENSE](LICENSE).
 
 # Українська
 
-`jForms` — пакет для AJAX-відправлення Blade-форм і збереження відповідей у JSON для Evolution CMS 3. Розмітку форми пишіть звичайним Blade/HTML, правила перевірки задавайте у контролері.
+Докладні інструкції: [українською](docs/uk/usage.md) · [English](docs/en/usage.md)
+
+`jForms` — пакет для AJAX-відправлення Blade-форм і збереження відповідей у JSON для Evolution CMS 3. Розмітку форми пишіть звичайним Blade/HTML, правила перевірки задавайте у довіреній серверній конфігурації або коді контролера.
 
 ## Вимоги
 
@@ -131,9 +134,9 @@ php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 ```
 
-Міграція створює таблицю `jforms_responses`. У менеджері з’явиться модуль **«Відповіді форм» / “Form responses”**. Він показує форми з відповідями, дозволяє переглядати їх і видаляти відповідно до прав менеджера.
+Міграція створює таблицю `jforms_responses`. У менеджері з’явиться модуль **«Відповіді форм» / “Form responses”**. Він показує форми з відповідями, дозволяє переглядати їх і видаляти відповідно до прав менеджера. Якщо встановлено Evo UI, модуль використовує його тему й компоненти; без Evo UI працює вбудований Blade-інтерфейс.
 
-Щоб опублікувати стандартну конфігурацію в `core/custom/config/jforms.php`:
+Щоб опублікувати стандартну конфігурацію в `core/custom/config/jevo/jforms.php`:
 
 ```sh
 php artisan vendor:publish --tag=jforms-config
