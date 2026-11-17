@@ -41,7 +41,20 @@
         .evo-ui-jforms__bulk{display:flex;align-items:center;gap:12px;margin:0 0 12px}.evo-ui-jforms__bulk>label,.evo-ui-jforms__select{display:inline-flex;align-items:center;gap:8px}
         .evo-ui-jforms__select input,.evo-ui-jforms__bulk input{accent-color:var(--evo-ui-primary)}
         .evo-ui-jforms__response-head .evo-ui-jforms__select{margin-right:auto}.evo-ui-jforms__pagination{margin-top:18px;overflow-x:auto}
+        .evo-ui-jforms__response{padding:10px 14px!important}
+        .evo-ui-jforms__response .evo-ui-jforms__response-head{margin-bottom:7px}
+        .evo-ui-jforms__response-row{display:flex;align-items:center;gap:12px;min-width:0}
+        .evo-ui-jforms__response .evo-ui-jforms__data{display:flex;flex:1;flex-wrap:wrap;align-items:baseline;gap:5px 18px;min-width:0;margin:0}
+        .evo-ui-jforms__response .evo-ui-jforms__field{display:flex;align-items:baseline;gap:7px;min-width:0;padding:0;background:transparent}
+        .evo-ui-jforms__response .evo-ui-jforms__field-label{flex:none;font-size:10px}
+        .evo-ui-jforms__response .evo-ui-jforms__field-value{font-size:13px}
+        .evo-ui-jforms__response .evo-ui-jforms__actions{flex:none;gap:6px;padding:0;border:0}
+        .evo-ui-jforms__response .evo-ui-jforms__actions form{display:flex}
+        .evo-ui-jforms__icon-btn{display:inline-flex;width:34px;height:34px;min-height:34px;align-items:center;justify-content:center;padding:0}
+        .evo-ui-jforms__icon-btn svg{width:17px;height:17px}
+        .evo-ui-jforms__date{white-space:nowrap}
         @media(max-width:680px){.evo-ui-jforms{padding:16px}.evo-ui-jforms__form-link{grid-template-columns:auto minmax(0,1fr) auto}.evo-ui-jforms__form-date{grid-column:2;text-align:left}.evo-ui-jforms__form-arrow{display:none}.evo-ui-jforms__detail .evo-ui-jforms__field{grid-template-columns:1fr}}
+        @media(max-width:560px){.evo-ui-jforms__response-row{align-items:flex-start;flex-direction:column}.evo-ui-jforms__response .evo-ui-jforms__actions{align-self:flex-end}.evo-ui-jforms__date{font-size:11px}}
     </style>
 </head>
 <body class="evo-ui-page {{ $themeClasses }}" data-theme="{{ $theme }}" data-theme-mode="{{ $themeMode }}" style="background-color: var(--evo-ui-bg, {{ $themeBackground }})">

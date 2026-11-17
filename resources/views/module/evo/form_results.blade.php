@@ -27,14 +27,16 @@
                 @php($fields = json_decode($response->data, true) ?: [])
                 <x-evo::card class="evo-ui-jforms__response">
                     <div class="evo-ui-jforms__response-head"><label class="evo-ui-jforms__select"><input type="checkbox" name="ids[]" value="{{ $response->id }}" form="jforms-bulk-delete" class="jforms-select-response" aria-label="{{ $t('select_response', ['id' => $response->id]) }}"><strong>#{{ $response->id }}</strong></label><span class="evo-ui-jforms__date"><x-evo::icon name="clock" /> {{ $response->created_at }}</span></div>
-                    <div class="evo-ui-jforms__data">
-                        @foreach ($fields as $key => $value)
-                            <div class="evo-ui-jforms__field"><span class="evo-ui-jforms__field-label">{{ $key }}</span><strong class="evo-ui-jforms__field-value">{{ is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE) }}</strong></div>
-                        @endforeach
-                    </div>
-                    <div class="evo-ui-jforms__actions">
-                        <a class="evo-ui-btn evo-ui-btn--primary evo-ui-btn--filled" href="{{ route('jForms.response', ['form' => $form, 'response' => $response->id]) }}"><x-evo::icon name="eye" class="evo-ui-btn__icon" /><span class="evo-ui-btn__label">{{ $t('view_response') }}</span></a>
-                        <form method="post" action="{{ route('jForms.destroy', ['id' => $response->id]) }}" onsubmit="return confirm(this.dataset.confirm)" data-confirm="{{ $t('confirm_delete') }}">@csrf<button class="evo-ui-btn evo-ui-btn--danger" type="submit"><x-evo::icon name="trash" class="evo-ui-btn__icon" /><span class="evo-ui-btn__label">{{ $t('delete') }}</span></button></form>
+                    <div class="evo-ui-jforms__response-row">
+                        <div class="evo-ui-jforms__data">
+                            @foreach ($fields as $key => $value)
+                                <div class="evo-ui-jforms__field"><span class="evo-ui-jforms__field-label">{{ $key }}</span><strong class="evo-ui-jforms__field-value">{{ is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE) }}</strong></div>
+                            @endforeach
+                        </div>
+                        <div class="evo-ui-jforms__actions">
+                            <a class="evo-ui-btn evo-ui-jforms__icon-btn" href="{{ route('jForms.response', ['form' => $form, 'response' => $response->id]) }}" aria-label="{{ $t('view_response') }}" title="{{ $t('view_response') }}"><x-evo::icon name="eye" /></a>
+                            <form method="post" action="{{ route('jForms.destroy', ['id' => $response->id]) }}" onsubmit="return confirm(this.dataset.confirm)" data-confirm="{{ $t('confirm_delete') }}">@csrf<button class="evo-ui-btn evo-ui-btn--danger evo-ui-jforms__icon-btn" type="submit" aria-label="{{ $t('delete') }}" title="{{ $t('delete') }}"><x-evo::icon name="trash" /></button></form>
+                        </div>
                     </div>
                 </x-evo::card>
             @endforeach

@@ -122,6 +122,22 @@ return [
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
 ```
 
+### Сторонні сповіщення
+
+Після відправлення форма генерує події `jforms:success` або `jforms:error`. Вони спливають до `document`; текст повідомлення доступний у `event.detail.message`, а для помилки HTTP-код — у `event.detail.status`. Підпишіть потрібну бібліотеку сповіщень у власному JS-файлі:
+
+```js
+document.addEventListener('jforms:success', (event) => {
+    Swal.fire({ icon: 'success', text: event.detail.message });
+});
+
+document.addEventListener('jforms:error', (event) => {
+    Swal.fire({ icon: 'error', text: event.detail.message });
+});
+```
+
+Тут `Swal.fire()` — приклад для SweetAlert2. Для Toastify, Notyf або іншої бібліотеки замініть його на її метод показу повідомлень. Саму сторонню бібліотеку та цей підписчик підключайте окремо; пакет jForms не додає зовнішні залежності.
+
 ## 5. Захист і відповіді сервера
 
 - **CSRF:** маршрут працює в middleware-групі `web`. Додайте `@csrf` і передавайте токен у заголовку `X-CSRF-TOKEN`.

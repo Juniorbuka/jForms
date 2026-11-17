@@ -21,7 +21,7 @@ php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 ```
 
-The migration creates the `jforms_responses` table. The manager module **Form responses / Відповіді форм** lists forms with responses and lets authorized manager users browse and delete submissions. When Evo UI is installed, the module uses its manager theme and components; otherwise, it uses the built-in Blade interface.
+One migration creates the `jforms_responses` table and one-time-token index. On existing installations, it adds any missing token schema and removes the obsolete idempotency column without deleting saved responses. The manager module **Form responses / Відповіді форм** lists forms with responses and lets authorized manager users browse and delete submissions. When Evo UI is installed, the module uses its manager theme and components; otherwise, it uses the built-in Blade interface.
 
 To publish the default configuration to `core/custom/config/jevo/jforms.php`:
 
@@ -89,6 +89,8 @@ Register the form in `core/custom/config/jevo/jforms.php`, then use the package 
 ```
 
 The jForms AJAX handler is included in the package at `resources/js/jforms.js` with a minified build at `resources/js/jforms.min.js`. Publish the asset with `php artisan vendor:publish --tag=jforms-assets`; the package injects `/assets/modules/jforms/jforms.min.js` into templates containing the form marker. It uses native browser APIs and does not depend on the theme bundle or jQuery. Before each submit, it fetches a fresh form token; the server validates its signature, expiry, and one-time use.
+
+For custom toast or modal notifications, listen for the bubbling `jforms:success` and `jforms:error` events on `document`. Their `event.detail.message` contains the displayed message; errors also include the HTTP code in `event.detail.status`. Examples for SweetAlert2 and other libraries are in the [usage guide](docs/en/usage.md).
 
 ## License
 

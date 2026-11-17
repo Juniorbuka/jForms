@@ -35,14 +35,16 @@
                         <label class="jf-select-response"><input type="checkbox" name="ids[]" value="{{ $response->id }}" form="jforms-bulk-delete" class="jforms-select-response" aria-label="{{ __('jForms::module.select_response', ['id' => $response->id]) }}"><strong class="jf-response-id">#{{ $response->id }}</strong></label>
                         <span class="jf-date">@svg('tabler-clock', '', ['width' => 16, 'height' => 16, 'aria-hidden' => 'true']) {{ $response->created_at }}</span>
                     </div>
-                    <div class="jf-data-grid">
-                        @foreach ($fields as $key => $value)
-                            <div class="jf-data-item"><span>{{ $key }}</span><strong>{{ is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE) }}</strong></div>
-                        @endforeach
-                    </div>
-                    <div class="jf-response-card__actions">
-                        <a class="jf-button jf-button--primary" href="{{ route('jForms.response', ['form' => $form, 'response' => $response->id]) }}">@svg('tabler-eye', '', ['width' => 16, 'height' => 16, 'aria-hidden' => 'true']) {{ __('jForms::module.view_response') }}</a>
-                        <form method="post" action="{{ route('jForms.destroy', ['id' => $response->id]) }}" onsubmit="return confirm(@json(__('jForms::module.confirm_delete')))">@csrf<button class="jf-button jf-button--danger" type="submit">@svg('tabler-trash', '', ['width' => 16, 'height' => 16, 'aria-hidden' => 'true']) {{ __('jForms::module.delete') }}</button></form>
+                    <div class="jf-response-card__row">
+                        <div class="jf-data-grid">
+                            @foreach ($fields as $key => $value)
+                                <div class="jf-data-item"><span>{{ $key }}</span><strong>{{ is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE) }}</strong></div>
+                            @endforeach
+                        </div>
+                        <div class="jf-response-card__actions">
+                            <a class="jf-button jf-button--icon" href="{{ route('jForms.response', ['form' => $form, 'response' => $response->id]) }}" aria-label="{{ __('jForms::module.view_response') }}" title="{{ __('jForms::module.view_response') }}">@svg('tabler-eye', '', ['width' => 17, 'height' => 17, 'aria-hidden' => 'true'])</a>
+                            <form method="post" action="{{ route('jForms.destroy', ['id' => $response->id]) }}" onsubmit="return confirm(@json(__('jForms::module.confirm_delete')))" >@csrf<button class="jf-button jf-button--danger jf-button--icon" type="submit" aria-label="{{ __('jForms::module.delete') }}" title="{{ __('jForms::module.delete') }}">@svg('tabler-trash', '', ['width' => 17, 'height' => 17, 'aria-hidden' => 'true'])</button></form>
+                        </div>
                     </div>
                 </section>
             @endforeach

@@ -4,3 +4,17 @@
 @media(max-width:650px){.jf-admin{padding:20px 14px 32px}.jf-heading h1{font-size:20px}.jf-form-card{flex-wrap:wrap;padding:14px}.jf-form-card__date{width:100%;padding-left:58px}.jf-response-card{padding:16px}.jf-response-card__head{align-items:flex-start;flex-direction:column}.jf-data-grid--detail .jf-data-item{grid-template-columns:1fr}}
 .jf-filters{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:0 0 14px;padding:16px;background:#fff;border:1px solid #e7eaf0;border-radius:12px}.jf-filters label{display:grid;gap:5px;color:#667085;font-size:12px;font-weight:600}.jf-filters input{min-height:36px;padding:7px 9px;border:1px solid #d9dee8;border-radius:7px;font:inherit}.jf-filters .jf-search{flex:1;min-width:220px}.jf-filters .jf-search input{width:100%}.jf-button--plain{color:#344054;background:#fff;border-color:#d0d5dd}.jf-bulk-bar{display:flex;align-items:center;gap:12px;margin:0 0 12px}.jf-bulk-bar>label,.jf-select-response{display:inline-flex;align-items:center;gap:8px}.jf-select-response input,.jf-bulk-bar input{accent-color:#536dfe}.jf-response-card__head .jf-select-response{margin-right:auto}.jf-response-card__head .jf-date{margin-left:auto}.jf-pagination{margin-top:18px;overflow-x:auto}.jf-pagination nav{display:flex;justify-content:center}
 </style>
+<style>
+.jf-response-card{padding:11px 13px;box-shadow:none}
+.jf-response-card__head{gap:10px;padding-bottom:8px}
+.jf-response-card__row{display:flex;align-items:center;gap:12px;min-width:0}
+.jf-response-card__row .jf-data-grid{display:flex;flex:1;flex-wrap:wrap;align-items:baseline;gap:5px 18px;min-width:0;padding:0;margin:0}
+.jf-response-card__row .jf-data-item{display:flex;align-items:baseline;gap:7px;min-width:0;padding:0;background:transparent}
+.jf-response-card__row .jf-data-item>span{flex:none;font-size:10px}
+.jf-response-card__row .jf-data-item strong{font-size:13px}
+.jf-response-card__actions{flex:none;gap:6px;padding:0;border:0}
+.jf-response-card__actions form{display:flex}
+.jf-button--icon{width:34px;min-height:34px;height:34px;padding:0}
+.jf-date{white-space:nowrap}
+@media(max-width:650px){.jf-response-card__row{align-items:flex-start;flex-direction:column}.jf-response-card__actions{align-self:flex-end}.jf-date{font-size:11px}}
+</style>

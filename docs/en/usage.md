@@ -122,6 +122,22 @@ Publish the package JavaScript with `php artisan vendor:publish --tag=jforms-ass
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
 ```
 
+### Third-party notifications
+
+After submission, the form dispatches `jforms:success` or `jforms:error`. Both events bubble to `document`; the message is available as `event.detail.message`, and an error's HTTP code is available as `event.detail.status`. Connect your notification library in your own JavaScript:
+
+```js
+document.addEventListener('jforms:success', (event) => {
+    Swal.fire({ icon: 'success', text: event.detail.message });
+});
+
+document.addEventListener('jforms:error', (event) => {
+    Swal.fire({ icon: 'error', text: event.detail.message });
+});
+```
+
+`Swal.fire()` is an example using SweetAlert2. For Toastify, Notyf, or another library, replace it with that library's notification method. Load the library and your listener separately; jForms does not add third-party dependencies.
+
 ## 5. Protection and response behavior
 
 - **CSRF:** the endpoint runs in the `web` middleware group. The form must include `@csrf`; send its token as `X-CSRF-TOKEN`.

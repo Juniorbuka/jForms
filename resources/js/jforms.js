@@ -74,6 +74,10 @@
             submissionToken.value = result.next_token || '';
             status.textContent = result.message || messages.success;
             status.dataset.state = 'success';
+            form.dispatchEvent(new CustomEvent('jforms:success', {
+                bubbles: true,
+                detail: { message: status.textContent }
+            }));
         } catch (error) {
             if (response && response.status === 419) {
                 try {
@@ -87,6 +91,10 @@
                 ? messages.invalidResponse
                 : (error.message || messages.error);
             status.dataset.state = 'error';
+            form.dispatchEvent(new CustomEvent('jforms:error', {
+                bubbles: true,
+                detail: { message: status.textContent, status: response ? response.status : null }
+            }));
         } finally {
             button.disabled = false;
         }
