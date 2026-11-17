@@ -12,11 +12,9 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->string('form_key', 100)->index();
             $table->string('form_name', 190);
-            $table->char('idempotency_key', 36)->nullable();
             $table->json('data');
             $table->timestamp('created_at')->useCurrent();
             $table->index(['form_key', 'created_at']);
-            $table->unique(['form_key', 'idempotency_key'], 'jforms_idempotency_unique');
         });
     }
 

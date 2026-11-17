@@ -45,7 +45,6 @@ return [
                 'attempts' => 10,
                 'decay_seconds' => 60,
             ],
-            'token_ttl_seconds' => 3600,
         ],
     ],
 ];
@@ -63,7 +62,6 @@ Available settings:
 | `rate_limit.attempts` | Number of allowed attempts per IP address and form during the time window. Defaults to `10`. |
 | `rate_limit.decay_seconds` | Rate-limit window in seconds. Defaults to `60`; values below `60` are raised to `60`. |
 | `max_payload_bytes` | Maximum request size in bytes. Defaults to `16384` (16 KB). |
-| `token_ttl_seconds` | Lifetime of a form token. Defaults to `3600` seconds; allowed range is 60 seconds to 24 hours. |
 
 Use standard Laravel validation rules. Fields absent from `rules` are discarded even if a browser submits them. A `name` change does not alter old responses; records retain the name saved at submission time.
 
@@ -72,9 +70,8 @@ Use standard Laravel validation rules. Fields absent from `rules` are discarded 
 The package route accepts JSON at `POST /jforms/{form}`. Include the form key configured above and a CSRF token:
 
 ```blade
-<form id="appointment-form" data-jforms-form data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
+<form id="appointment-form" data-jforms-form action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
     @csrf
-    <input type="hidden" name="_jforms_token" value="">
     <label>
         Name
         <input name="name" autocomplete="name" required maxlength="120">
@@ -115,7 +112,7 @@ Use visually-hidden CSS for `.form-honeypot` rather than removing it from the HT
 
 ## 4. Send with AJAX
 
-Include the JavaScript file shipped in the package. It fetches a one-time token for each form when the page opens, posts JSON with the CSRF token, and displays the result in `[data-jforms-status]`:
+Include the JavaScript file shipped in the package. It posts JSON with the CSRF token and displays the result in `[data-jforms-status]`:
 
 ```blade
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
@@ -131,10 +128,8 @@ Include the JavaScript file shipped in the package. It fetches a one-time token 
 - **Server-side allowlist:** only fields named in `rules` are validated and stored. Never build rules or form names from request input.
 - **Validation:** Laravel validates values before insertion and trims string values. Invalid data returns HTTP `422` with JSON validation errors.
 - **Honeypot:** the hidden field must be present and empty; a filled or missing field is rejected with HTTP `422`.
-- **One-time token:** the form GET endpoint issues a signed random token, sets it in an HttpOnly cookie tied to the form key, and returns it for the hidden field. The server compares both values and checks signature and expiry (one hour by default). A successful save records use in cache and the database; replay returns HTTP `419`.
 - **Rate limiting:** attempts are limited independently by form and client IP. Exceeding the limit returns HTTP `429`. Invalid attempts also count toward the limit.
 - **Request size:** requests larger than `max_payload_bytes` are rejected with HTTP `413`.
-- **Replay protection:** `_jforms_token` is used as the database uniqueness key. The unique index prevents the token from being stored twice; a replay after use is rejected with HTTP `419`.
 - **Storage:** only validated values are saved in the JSON `data` column of `jforms_responses`, along with the form key/name and timestamp. File uploads are not supported.
 - **Data privacy:** values are stored in the database as JSON and are not encrypted by jForms. Store only the information the site needs, restrict manager/database access, and remove records when they are no longer needed.
 
@@ -144,15 +139,11 @@ The endpoint also returns `406` when the request is not JSON. A form key that is
 
 ## 6. Define validation and storage in your controller instead
 
-For controller-owned forms, use `submitDefinition()`. Its rules and form name must still be constants or trusted server-side values. For `submitDefinition()`, use the same token pair: call the `jForms.token` GET endpoint, pass the hidden `_jforms_token` to `submitDefinition()`, and include the matching cookie value as `_jforms_cookie_token`. The package's regular submission route handles this automatically:
-
-```php
+For controller-owned forms, use `submitDefinition()`. Its rules and form name must still be constants or trusted server-side values. ```php
 $result = $jForms->submitDefinition(
     'appointment',
     'Appointment request',
-    array_replace($request->all(), [
-        '_jforms_idempotency' => $request->header('Idempotency-Key'),
-    ]),
+    $request->all(),
     [
         'phone' => ['required', 'string', 'max:40'],
         'email' => ['nullable', 'email:rfc', 'max:190'],
@@ -168,7 +159,7 @@ $result = $jForms->submitDefinition(
 return response()->json(['ok' => true] + $result, 201);
 ```
 
-Register the controller's POST route inside `web` middleware. This method uses the same validation, honeypot, rate limit, idempotency, and JSON storage behavior.
+Register the controller's POST route inside `web` middleware. This method uses the same validation, honeypot, rate limit, and JSON storage behavior.
 
 ## 7. Review saved responses
 
@@ -178,7 +169,7 @@ Open **Form responses** in the Evolution manager. Select a form to view its subm
 
 - **The module says its table is missing:** from the site's `core/` directory run `php artisan migrate` against the same database used by the website.
 - **A form key returns 404:** check that the key exists under `forms` in `core/custom/config/jevo/jforms.php` and clear the application configuration cache if enabled.
-- **The request returns 419:** reload the page to obtain a fresh CSRF token and confirm the POST route uses `web` middleware.
+- **The request returns 419:** check the CSRF token and confirm the POST route uses `web` middleware.
 - **The request returns 406:** send a JSON body with `Content-Type: application/json` and `Accept: application/json`.
 - **The manager layout did not change after a package update:** clear compiled views with `php artisan view:clear` from `core/`.
 
