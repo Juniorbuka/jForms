@@ -67,8 +67,16 @@ class ModuleController
 
     public function destroy(Request $request, int $id)
     {
+        $response = DB::table('jforms_responses')->where('id', $id)->first();
+        if (!$response) {
+            throw new HttpException(404);
+        }
+
         DB::table('jforms_responses')->where('id', $id)->delete();
-        return redirect()->back()->with('status', __('jForms::module.deleted'));
+
+        return redirect()
+            ->route('jForms.show', ['form' => $response->form_key])
+            ->with('status', __('jForms::module.deleted'));
     }
 
     public function bulkDestroy(Request $request, string $form)

@@ -45,7 +45,7 @@ Route::middleware('web')->post('/appointment', function (Request $request, Submi
         'appointment',
         'Appointment request',
         array_replace($request->all(), [
-            '_jforms_idempotency' => $request->header('Idempotency-Key'),
+            '_jforms_cookie_token' => $request->cookie($jForms->cookieNameForForm('appointment')),
         ]),
         [
             'phone' => ['required', 'string', 'max:40'],
@@ -55,7 +55,8 @@ Route::middleware('web')->post('/appointment', function (Request $request, Submi
         (string) $request->ip(),
         [
             'honeypot' => 'website',
-            'rate_limit' => ['attempts' => 5, 'decay_seconds' => 600],
+            'rate_limit' => ['attempts' => 10, 'decay_seconds' => 60],
+            'max_payload_bytes' => 16384,
             'success_message' => 'Thank you. We will contact you soon.',
         ]
     );
@@ -64,48 +65,31 @@ Route::middleware('web')->post('/appointment', function (Request $request, Submi
 });
 ```
 
-`submitDefinition()` validates only fields listed in the server rules, discards other request keys, rate-limits submissions by IP and form, checks a honeypot, prevents duplicate submissions using `Idempotency-Key`, and stores validated values in JSON. Validation errors return Laravel's JSON response with status `422`.
+`submitDefinition()` validates only fields listed in the server rules, discards other request keys, rate-limits submissions by IP and form (10 attempts per minute by default), requires an empty honeypot field, caps the payload at 16 KB, and requires a random, signed, form-bound, expiring one-time token that must match its HttpOnly cookie. The server uses that token as the database uniqueness key, so replay is prevented even if two requests arrive together. A fresh token is returned after a successful save. CSRF is enforced by the `web` middleware. These measures reduce automated abuse without CAPTCHA; they do not guarantee that every bot is blocked.
 
 ## Blade form and AJAX
 
+Register the form in `core/custom/config/jevo/jforms.php`, then use the package routes and JavaScript asset:
+
 ```blade
-<form id="appointment-form">
+<form id="appointment-form"
+      data-jforms-form
+      data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}"
+      action="{{ route('jForms.submit', ['form' => 'appointment']) }}"
+      method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="">
     <input type="tel" name="phone" required>
     <input type="email" name="email">
     <input type="text" name="child_name">
     <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="d-none">
     <button type="submit">Send</button>
-    <p id="appointment-message" aria-live="polite"></p>
+    <p data-jforms-status role="status" aria-live="polite"></p>
 </form>
-<script>
-document.querySelector('#appointment-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const key = form.dataset.submissionKey || crypto.randomUUID();
-    form.dataset.submissionKey = key;
-    const response = await fetch('/appointment', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-            'Idempotency-Key': key,
-        },
-        body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
-    });
-    const result = await response.json();
-    const message = document.querySelector('#appointment-message');
-    message.textContent = response.ok ? result.message : Object.values(result.errors || {}).flat().join(' ');
-    if (response.ok) {
-        form.reset();
-        delete form.dataset.submissionKey;
-    }
-});
-</script>
+<script src="{{ route('jForms.asset') }}" defer></script>
 ```
 
-Use `textContent` when displaying server responses. Serve the site over HTTPS so `crypto.randomUUID()` is available.
+The package script fetches a token when the page opens, sends JSON with the CSRF token, and updates the hidden token after success. It is served from the package and can be included only on pages that use jForms.
 
 ## License
 
@@ -148,7 +132,7 @@ php artisan vendor:publish --tag=jforms-config
 
 Зареєструйте POST-маршрут у middleware-групі `web`, щоб діяла CSRF-перевірка. Назву форми й правила валідації задавайте в довіреному PHP-коді сервера, а не в запиті браузера. Приклади контролера та Blade/AJAX-форми наведені в англійській секції вище.
 
-`submitDefinition()` перевіряє лише поля, задані сервером, відкидає інші ключі запиту, обмежує частоту відправлень за IP та формою, перевіряє honeypot і захищає від повторного збереження за `Idempotency-Key`. Валідовані дані записуються у JSON. Помилки валідації повертаються у JSON зі статусом `422`.
+`submitDefinition()` перевіряє лише поля, задані сервером, відкидає інші ключі запиту, обмежує частоту надсилань за IP та формою (за замовчуванням 10 спроб за хвилину), вимагає порожнє поле honeypot, обмежує запит до 16 КБ і вимагає випадковий одноразовий токен, прив’язаний до сесії та форми. Сервер використовує токен як унікальний ключ у базі, тому повторне чи паралельне надсилання не створює другу відповідь. Після успішного збереження сервер повертає новий токен. CSRF перевіряється middleware-групою `web`. Перевірки зменшують автоматизований спам без CAPTCHA, але не гарантують блокування всіх ботів.
 
 ## Ліцензія
 

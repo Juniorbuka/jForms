@@ -42,9 +42,10 @@ return [
             ],
             'honeypot' => 'website',
             'rate_limit' => [
-                'attempts' => 5,
-                'decay_seconds' => 600,
+                'attempts' => 10,
+                'decay_seconds' => 60,
             ],
+            'token_ttl_seconds' => 3600,
         ],
     ],
 ];
@@ -59,8 +60,10 @@ return [
 | `rules` | Правила валідації Laravel. Ці ключі також визначають, які поля дозволено зберігати. |
 | `messages` | Необов’язкові повідомлення Laravel, наприклад `phone.required`. |
 | `honeypot` | Назва прихованого поля для відсікання ботів. За замовчуванням — `website`. |
-| `rate_limit.attempts` | Кількість спроб з однієї IP-адреси для цієї форми за період. За замовчуванням — `5`. |
-| `rate_limit.decay_seconds` | Період обмеження у секундах. За замовчуванням — `600`; значення менші за `60` буде збільшено до `60`. |
+| `rate_limit.attempts` | Кількість спроб з однієї IP-адреси для цієї форми за період. За замовчуванням — `10`. |
+| `rate_limit.decay_seconds` | Період обмеження у секундах. За замовчуванням — `60`; значення менші за `60` буде збільшено до `60`. |
+| `max_payload_bytes` | Максимальний розмір запиту у байтах. За замовчуванням — `16384` (16 КБ). |
+| `token_ttl_seconds` | Час дії токена форми. За замовчуванням — `3600` секунд; допустимий діапазон — від 60 секунд до 24 годин. |
 
 Працюють стандартні правила валідації Laravel. Поля, яких немає в `rules`, відкидаються, навіть якщо браузер їх надіслав. Якщо змінити `name`, попередні відповіді не зміняться: у них збережеться назва, яка була на момент відправлення.
 
@@ -69,8 +72,9 @@ return [
 Маршрут пакета приймає JSON за адресою `POST /jforms/{form}`. Вкажіть налаштований ключ форми й додайте CSRF-токен:
 
 ```blade
-<form id="appointment-form" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
+<form id="appointment-form" data-jforms-form data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="">
     <label>
         Ім’я
         <input name="name" autocomplete="name" required maxlength="120">
@@ -111,46 +115,14 @@ return [
 
 ## 4. Надсилання через AJAX
 
-```html
-<script>
-document.querySelector('#appointment-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
+Підключіть JS-файл, який постачається в пакеті. Він одразу запитує одноразовий токен для кожної форми, надсилає JSON із CSRF-токеном і показує результат у `[data-jforms-status]`:
 
-    const form = event.currentTarget;
-    const status = document.querySelector('#appointment-status');
-    const key = form.dataset.idempotencyKey || crypto.randomUUID();
-    form.dataset.idempotencyKey = key;
-    status.textContent = 'Надсилання…';
-
-    try {
-        const response = await fetch(form.action, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-                'Idempotency-Key': key,
-            },
-            body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
-        });
-        const result = await response.json();
-
-        if (!response.ok) {
-            const validationMessages = Object.values(result.errors || {}).flat();
-            throw new Error(validationMessages.join(' ') || result.message || 'Не вдалося надіслати форму.');
-        }
-
-        status.textContent = result.message;
-        form.reset();
-        delete form.dataset.idempotencyKey;
-    } catch (error) {
-        status.textContent = error.message || 'Помилка з’єднання. Спробуйте ще раз.';
-    }
-});
-</script>
+```blade
+<p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
+<script src="{{ route('jForms.asset') }}" defer></script>
 ```
 
-Використовуйте HTTPS — тоді доступний `crypto.randomUUID()`. Виводьте повідомлення сервера через `textContent`. Під час повторної спроби надіслати ту саму відповідь використовуйте той самий ключ; для нового відправлення створюйте новий.
+Файл `jforms.js` належить пакету і не залежить від JS-файлів теми. Його можна підключити лише на сторінках із формами jForms.
 
 ## 5. Захист і відповіді сервера
 
@@ -158,9 +130,11 @@ document.querySelector('#appointment-form').addEventListener('submit', async (ev
 - **Лише JSON:** надсилайте `Content-Type: application/json` і `Accept: application/json`.
 - **Дозволені поля:** сервер перевіряє і зберігає лише поля, вказані у `rules`. Не формуйте правила чи назву форми з даних запиту.
 - **Валідація:** перед записом Laravel перевіряє значення та обрізає пробіли в рядках. Помилки повертаються у JSON зі статусом `422`.
-- **Honeypot:** заповнене приховане поле відхиляється зі статусом `422`.
+- **Honeypot:** приховане поле має бути присутнім і порожнім; заповнене або відсутнє поле відхиляється зі статусом `422`.
+- **Одноразовий токен:** GET-маршрут форми видає випадковий підписаний токен, встановлює його в HttpOnly cookie, прив’язану до ключа форми, і повертає токен для прихованого поля. Сервер порівнює обидва значення, перевіряє підпис і термін дії (1 година за замовчуванням). Після збереження токен позначається використаним у кеші й таблиці; повторне надсилання відхиляється зі статусом `419`.
 - **Обмеження частоти:** ліміт ведеться окремо для кожної форми та IP-адреси. Після перевищення повертається `429`. Невдалі спроби також враховуються.
-- **Захист від дублів:** кожен запит має містити UUID v4 у заголовку `Idempotency-Key`. Повторний запит з тим самим ключем для тієї самої форми не створює нового запису; у відповіді буде `duplicate: true`.
+- **Розмір запиту:** запити понад `max_payload_bytes` відхиляються зі статусом `413`.
+- **Захист від повтору:** `_jforms_token` використовується як ключ унікальності бази даних. Унікальний індекс не дозволяє зберегти токен двічі; повтор після використання відхиляється зі статусом `419`.
 - **Збереження:** у JSON-колонку `data` таблиці `jforms_responses` записуються лише перевірені значення, а також ключ і назва форми та час відправлення. Завантаження файлів не підтримується.
 - **Приватність даних:** jForms зберігає значення в базі як JSON і не шифрує їх. Зберігайте лише необхідну сайту інформацію, обмежте доступ до менеджера та бази даних і видаляйте застарілі записи.
 
@@ -171,6 +145,8 @@ Honeypot і обмеження частоти зменшують автомат�
 ## 6. Валідація і збереження у власному контролері
 
 Для форми, якою керує ваш контролер, викликайте `submitDefinition()`. Назва форми й правила мають залишатися довіреними серверними значеннями:
+
+Для `submitDefinition()` використовуйте ту саму пару токенів: викличте GET-маршрут `jForms.token`, передайте прихований `_jforms_token` у `submitDefinition()` і додайте cookie з однойменної форми як `_jforms_cookie_token`. Звичайний маршрут пакета робить це автоматично.
 
 ```php
 $result = $jForms->submitDefinition(

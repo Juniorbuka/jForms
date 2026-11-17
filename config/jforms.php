@@ -14,7 +14,9 @@ return [
             ],
             'messages' => [],
             'honeypot' => 'website',
-            'rate_limit' => ['attempts' => 5, 'decay_seconds' => 600],
+            'rate_limit' => ['attempts' => 10, 'decay_seconds' => 60],
+            'max_payload_bytes' => 16384,
+            'token_ttl_seconds' => 3600,
         ],
     ],
 ];

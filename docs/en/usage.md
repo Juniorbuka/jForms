@@ -42,9 +42,10 @@ return [
             ],
             'honeypot' => 'website',
             'rate_limit' => [
-                'attempts' => 5,
-                'decay_seconds' => 600,
+                'attempts' => 10,
+                'decay_seconds' => 60,
             ],
+            'token_ttl_seconds' => 3600,
         ],
     ],
 ];
@@ -59,8 +60,10 @@ Available settings:
 | `rules` | Laravel validation rules. These keys are also the allowlist of stored fields. |
 | `messages` | Optional Laravel validation messages, such as `phone.required`. |
 | `honeypot` | Name of the hidden anti-bot field. Defaults to `website`. |
-| `rate_limit.attempts` | Number of allowed attempts per IP address and form during the time window. Defaults to `5`. |
-| `rate_limit.decay_seconds` | Rate-limit window in seconds. Defaults to `600`; values below `60` are raised to `60`. |
+| `rate_limit.attempts` | Number of allowed attempts per IP address and form during the time window. Defaults to `10`. |
+| `rate_limit.decay_seconds` | Rate-limit window in seconds. Defaults to `60`; values below `60` are raised to `60`. |
+| `max_payload_bytes` | Maximum request size in bytes. Defaults to `16384` (16 KB). |
+| `token_ttl_seconds` | Lifetime of a form token. Defaults to `3600` seconds; allowed range is 60 seconds to 24 hours. |
 
 Use standard Laravel validation rules. Fields absent from `rules` are discarded even if a browser submits them. A `name` change does not alter old responses; records retain the name saved at submission time.
 
@@ -69,8 +72,9 @@ Use standard Laravel validation rules. Fields absent from `rules` are discarded 
 The package route accepts JSON at `POST /jforms/{form}`. Include the form key configured above and a CSRF token:
 
 ```blade
-<form id="appointment-form" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
+<form id="appointment-form" data-jforms-form data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="">
     <label>
         Name
         <input name="name" autocomplete="name" required maxlength="120">
@@ -111,46 +115,14 @@ Use visually-hidden CSS for `.form-honeypot` rather than removing it from the HT
 
 ## 4. Send with AJAX
 
-```html
-<script>
-document.querySelector('#appointment-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
+Include the JavaScript file shipped in the package. It fetches a one-time token for each form when the page opens, posts JSON with the CSRF token, and displays the result in `[data-jforms-status]`:
 
-    const form = event.currentTarget;
-    const status = document.querySelector('#appointment-status');
-    const key = form.dataset.idempotencyKey || crypto.randomUUID();
-    form.dataset.idempotencyKey = key;
-    status.textContent = 'Sending…';
-
-    try {
-        const response = await fetch(form.action, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': form.querySelector('[name="_token"]').value,
-                'Idempotency-Key': key,
-            },
-            body: JSON.stringify(Object.fromEntries(new FormData(form).entries())),
-        });
-        const result = await response.json();
-
-        if (!response.ok) {
-            const validationMessages = Object.values(result.errors || {}).flat();
-            throw new Error(validationMessages.join(' ') || result.message || 'The form could not be sent.');
-        }
-
-        status.textContent = result.message;
-        form.reset();
-        delete form.dataset.idempotencyKey;
-    } catch (error) {
-        status.textContent = error.message || 'Connection error. Please try again.';
-    }
-});
-</script>
+```blade
+<p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
+<script src="{{ route('jForms.asset') }}" defer></script>
 ```
 
-Serve the site over HTTPS so `crypto.randomUUID()` is available. Use `textContent` for messages returned by the server. Keep the same idempotency key when retrying the same submission; a new, intentional submission should get a new key.
+`jforms.js` belongs to the package and does not depend on the theme's JavaScript. Include it only on pages that use jForms.
 
 ## 5. Protection and response behavior
 
@@ -158,9 +130,11 @@ Serve the site over HTTPS so `crypto.randomUUID()` is available. Use `textConten
 - **JSON-only endpoint:** send `Content-Type: application/json` and `Accept: application/json`.
 - **Server-side allowlist:** only fields named in `rules` are validated and stored. Never build rules or form names from request input.
 - **Validation:** Laravel validates values before insertion and trims string values. Invalid data returns HTTP `422` with JSON validation errors.
-- **Honeypot:** a non-empty honeypot field is rejected with HTTP `422`.
+- **Honeypot:** the hidden field must be present and empty; a filled or missing field is rejected with HTTP `422`.
+- **One-time token:** the form GET endpoint issues a signed random token, sets it in an HttpOnly cookie tied to the form key, and returns it for the hidden field. The server compares both values and checks signature and expiry (one hour by default). A successful save records use in cache and the database; replay returns HTTP `419`.
 - **Rate limiting:** attempts are limited independently by form and client IP. Exceeding the limit returns HTTP `429`. Invalid attempts also count toward the limit.
-- **Duplicate protection:** each request requires a UUID v4 `Idempotency-Key`. Repeating the same key for the same form does not create a second row; the response contains `duplicate: true`.
+- **Request size:** requests larger than `max_payload_bytes` are rejected with HTTP `413`.
+- **Replay protection:** `_jforms_token` is used as the database uniqueness key. The unique index prevents the token from being stored twice; a replay after use is rejected with HTTP `419`.
 - **Storage:** only validated values are saved in the JSON `data` column of `jforms_responses`, along with the form key/name and timestamp. File uploads are not supported.
 - **Data privacy:** values are stored in the database as JSON and are not encrypted by jForms. Store only the information the site needs, restrict manager/database access, and remove records when they are no longer needed.
 
@@ -170,7 +144,7 @@ The endpoint also returns `406` when the request is not JSON. A form key that is
 
 ## 6. Define validation and storage in your controller instead
 
-For controller-owned forms, use `submitDefinition()`. Its rules and form name must still be constants or trusted server-side values:
+For controller-owned forms, use `submitDefinition()`. Its rules and form name must still be constants or trusted server-side values. For `submitDefinition()`, use the same token pair: call the `jForms.token` GET endpoint, pass the hidden `_jforms_token` to `submitDefinition()`, and include the matching cookie value as `_jforms_cookie_token`. The package's regular submission route handles this automatically:
 
 ```php
 $result = $jForms->submitDefinition(

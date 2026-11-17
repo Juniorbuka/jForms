@@ -6,3 +6,11 @@ use Jevo\JForms\Http\Controllers\SubmissionController;
 Route::middleware(['web'])->post('/jforms/{form}', [SubmissionController::class, 'store'])
     ->where('form', '[A-Za-z0-9_-]+')
     ->name('jForms.submit');
+
+Route::middleware(['web'])->get('/jforms/{form}/token', [SubmissionController::class, 'token'])
+    ->where('form', '[A-Za-z0-9_-]+')
+    ->name('jForms.token');
+
+Route::get('/jforms/assets/jforms.js', [SubmissionController::class, 'asset'])
+    ->name('jForms.asset');
+
