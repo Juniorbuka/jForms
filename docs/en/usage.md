@@ -67,7 +67,7 @@ Use standard Laravel validation rules. Fields absent from `rules` are discarded 
 
 ## 3. Add a Blade form
 
-The package route accepts JSON at `POST /jforms/{form}`. Include the form key configured above and a CSRF token:
+The package accepts submissions at `POST /jforms/{form}`. Its JavaScript sends JSON over AJAX; if JavaScript is unavailable, the HTML form is also processed and redirects back to the page. Include the configured form key and a CSRF token:
 
 ```blade
 <form id="appointment-form" data-jforms-form action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
@@ -112,19 +112,19 @@ Use visually-hidden CSS for `.form-honeypot` rather than removing it from the HT
 
 ## 4. Send with AJAX
 
-Include the JavaScript file shipped in the package. It posts JSON with the CSRF token and displays the result in `[data-jforms-status]`:
+Include the theme JavaScript. The jForms handler lives in `theme/js/forms.js` and is bundled into `/theme/dist/js/forms.min.js`; it posts JSON with the CSRF token and displays the result in `[data-jforms-status]`:
 
 ```blade
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
-<script src="{{ route('jForms.asset') }}" defer></script>
+<script src="/theme/dist/js/forms.min.js" defer></script>
 ```
 
-`jforms.js` belongs to the package and does not depend on the theme's JavaScript. Include it only on pages that use jForms.
+Load this bundle after jQuery and the other scripts required by the theme.
 
 ## 5. Protection and response behavior
 
 - **CSRF:** the endpoint runs in the `web` middleware group. The form must include `@csrf`; send its token as `X-CSRF-TOKEN`.
-- **JSON-only endpoint:** send `Content-Type: application/json` and `Accept: application/json`.
+- **AJAX:** the package script sends `Content-Type: application/json` and `Accept: application/json`. Standard HTML form submission is also supported as a fallback.
 - **Server-side allowlist:** only fields named in `rules` are validated and stored. Never build rules or form names from request input.
 - **Validation:** Laravel validates values before insertion and trims string values. Invalid data returns HTTP `422` with JSON validation errors.
 - **Honeypot:** the hidden field must be present and empty; a filled or missing field is rejected with HTTP `422`.
@@ -135,7 +135,7 @@ Include the JavaScript file shipped in the package. It posts JSON with the CSRF 
 
 The honeypot and rate limit reduce automated abuse but are not a CAPTCHA or a guarantee that every bot will be blocked.
 
-The endpoint also returns `406` when the request is not JSON. A form key that is not configured returns `404`.
+A form key that is not configured returns `404`.
 
 ## 6. Define validation and storage in your controller instead
 
@@ -170,6 +170,5 @@ Open **Form responses** in the Evolution manager. Select a form to view its subm
 - **The module says its table is missing:** from the site's `core/` directory run `php artisan migrate` against the same database used by the website.
 - **A form key returns 404:** check that the key exists under `forms` in `core/custom/config/jevo/jforms.php` and clear the application configuration cache if enabled.
 - **The request returns 419:** check the CSRF token and confirm the POST route uses `web` middleware.
-- **The request returns 406:** send a JSON body with `Content-Type: application/json` and `Accept: application/json`.
 - **The manager layout did not change after a package update:** clear compiled views with `php artisan view:clear` from `core/`.
 

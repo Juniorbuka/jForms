@@ -82,10 +82,10 @@ Register the form in `core/custom/config/jevo/jforms.php`, then use the package 
     <button type="submit">Send</button>
     <p data-jforms-status role="status" aria-live="polite"></p>
 </form>
-<script src="{{ route('jForms.asset') }}" defer></script>
+<script src="/theme/dist/js/forms.min.js" defer></script>
 ```
 
-The package script sends JSON with the CSRF token and displays the result. It is served from the package and can be included only on pages that use jForms.
+The jForms AJAX handler belongs to the site theme: keep it in `theme/js/forms.js`, build it to `/theme/dist/js/forms.min.js`, and include that bundle after jQuery.
 
 ## License
 
