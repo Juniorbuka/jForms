@@ -10,6 +10,7 @@ From the Evolution CMS `core/` directory:
 php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 php artisan vendor:publish --tag=jforms-config
+php artisan vendor:publish --tag=jforms-assets
 ```
 
 The configuration file is published to:
@@ -45,6 +46,7 @@ return [
                 'attempts' => 10,
                 'decay_seconds' => 60,
             ],
+            'token_ttl_seconds' => 3600,
         ],
     ],
 ];
@@ -62,6 +64,7 @@ Available settings:
 | `rate_limit.attempts` | Number of allowed attempts per IP address and form during the time window. Defaults to `10`. |
 | `rate_limit.decay_seconds` | Rate-limit window in seconds. Defaults to `60`; values below `60` are raised to `60`. |
 | `max_payload_bytes` | Maximum request size in bytes. Defaults to `16384` (16 KB). |
+| `token_ttl_seconds` | Lifetime of the signed one-time token. Defaults to `3600` seconds; allowed range is 60 seconds to 24 hours. |
 
 Use standard Laravel validation rules. Fields absent from `rules` are discarded even if a browser submits them. A `name` change does not alter old responses; records retain the name saved at submission time.
 
@@ -70,8 +73,9 @@ Use standard Laravel validation rules. Fields absent from `rules` are discarded 
 The package accepts submissions at `POST /jforms/{form}`. Its JavaScript sends JSON over AJAX; if JavaScript is unavailable, the HTML form is also processed and redirects back to the page. Include the configured form key and a CSRF token:
 
 ```blade
-<form id="appointment-form" data-jforms-form action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
+<form id="appointment-form" data-jforms-form data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="{{ app(\Jevo\JForms\SubmissionService::class)->issueToken('appointment') }}">
     <label>
         Name
         <input name="name" autocomplete="name" required maxlength="120">
@@ -112,18 +116,16 @@ Use visually-hidden CSS for `.form-honeypot` rather than removing it from the HT
 
 ## 4. Send with AJAX
 
-Include the theme JavaScript. The jForms handler lives in `theme/js/forms.js` and is bundled into `/theme/dist/js/forms.min.js`; it posts JSON with the CSRF token and displays the result in `[data-jforms-status]`:
+Publish the package JavaScript with `php artisan vendor:publish --tag=jforms-assets`. Source is in `resources/js/jforms.js`; the minified build is `resources/js/jforms.min.js`. When a Blade template contains a form marked with `data-jforms-form`, the package automatically adds `/assets/modules/jforms/jforms.min.js`; there is no need to include it manually. The script has no dependency on the theme or jQuery; before posting, it obtains a fresh `_jforms_token`, sends JSON with the CSRF token and displays the result in `[data-jforms-status]`:
 
 ```blade
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
-<script src="/theme/dist/js/forms.min.js" defer></script>
 ```
-
-Load this bundle after jQuery and the other scripts required by the theme.
 
 ## 5. Protection and response behavior
 
 - **CSRF:** the endpoint runs in the `web` middleware group. The form must include `@csrf`; send its token as `X-CSRF-TOKEN`.
+- **One-time token:** the server signs a random token with the application key and binds it to the form key and expiry. After a successful save, its hash is recorded under a unique database key; replay and parallel reuse are rejected. The JS obtains the next token after success.
 - **AJAX:** the package script sends `Content-Type: application/json` and `Accept: application/json`. Standard HTML form submission is also supported as a fallback.
 - **Server-side allowlist:** only fields named in `rules` are validated and stored. Never build rules or form names from request input.
 - **Validation:** Laravel validates values before insertion and trims string values. Invalid data returns HTTP `422` with JSON validation errors.
@@ -135,7 +137,7 @@ Load this bundle after jQuery and the other scripts required by the theme.
 
 The honeypot and rate limit reduce automated abuse but are not a CAPTCHA or a guarantee that every bot will be blocked.
 
-A form key that is not configured returns `404`.
+A form key that is not configured returns `404`. An expired or already-used `_jforms_token` returns `419`; reload the form.
 
 ## 6. Define validation and storage in your controller instead
 
@@ -169,6 +171,6 @@ Open **Form responses** in the Evolution manager. Select a form to view its subm
 
 - **The module says its table is missing:** from the site's `core/` directory run `php artisan migrate` against the same database used by the website.
 - **A form key returns 404:** check that the key exists under `forms` in `core/custom/config/jevo/jforms.php` and clear the application configuration cache if enabled.
-- **The request returns 419:** check the CSRF token and confirm the POST route uses `web` middleware.
+- **The request returns 419:** check the CSRF token and `_jforms_token` expiry, reload the page, and confirm the POST route uses `web` middleware.
 - **The manager layout did not change after a package update:** clear compiled views with `php artisan view:clear` from `core/`.
 

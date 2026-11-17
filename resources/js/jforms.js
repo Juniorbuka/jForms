@@ -1,22 +1,59 @@
 (function () {
     'use strict';
 
-    async function submitForm(event) {
+    var messages = document.documentElement.lang.toLowerCase().startsWith('en')
+        ? {
+            sending: 'Sending…',
+            success: 'Thank you! Your response was sent.',
+            error: 'Unable to send the form. Please try again.',
+            token: 'Unable to prepare the form. Reload the page.',
+            invalidResponse: 'The server returned an invalid response. Please try again later.'
+        }
+        : {
+            sending: 'Надсилання…',
+            success: 'Дякуємо! Дані надіслано.',
+            error: 'Не вдалося надіслати форму. Спробуйте ще раз.',
+            token: 'Не вдалося підготувати форму. Оновіть сторінку.',
+            invalidResponse: 'Сервер повернув некоректну відповідь. Спробуйте пізніше.'
+        };
+
+    async function fetchToken(form) {
+        var response = await fetch(form.dataset.jformsTokenUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            cache: 'no-store'
+        });
+        var result = await response.json();
+
+        if (!response.ok || !result.token) {
+            throw new Error(result.message || messages.token);
+        }
+
+        return result.token;
+    }
+
+    document.addEventListener('submit', async function (event) {
+        var form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.matches('[data-jforms-form]')) return;
+
         event.preventDefault();
-        var form = event.currentTarget;
+
         var status = form.querySelector('[data-jforms-status]');
-        var button = form.querySelector('button[type="submit"]');
+        var button = form.querySelector('button[type="submit"], input[type="submit"]');
         var csrf = form.querySelector('[name="_token"]');
+        var submissionToken = form.querySelector('[name="_jforms_token"]');
 
-        if (!form.reportValidity()) return;
-        if (!status || !button || !csrf) return;
+        if (!form.reportValidity() || !status || !button || !csrf || !submissionToken) return;
 
-        status.textContent = 'Надсилання…';
+        status.textContent = messages.sending;
         status.removeAttribute('data-state');
         button.disabled = true;
 
+        var response;
         try {
-            var response = await fetch(form.action, {
+            submissionToken.value = await fetchToken(form);
+            response = await fetch(form.action, {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
@@ -26,35 +63,32 @@
                 credentials: 'same-origin',
                 body: JSON.stringify(Object.fromEntries(new FormData(form).entries()))
             });
-            var result = await response.json();
 
+            var result = await response.json();
             if (!response.ok) {
                 var firstError = result.errors && Object.values(result.errors)[0];
-                throw new Error(firstError ? (Array.isArray(firstError) ? firstError[0] : firstError) : (result.message || 'Не вдалося надіслати форму.'));
+                throw new Error(firstError ? (Array.isArray(firstError) ? firstError[0] : firstError) : (result.message || messages.error));
             }
 
             form.reset();
-            status.textContent = result.message || 'Дякуємо! Дані надіслано.';
+            submissionToken.value = result.next_token || '';
+            status.textContent = result.message || messages.success;
             status.dataset.state = 'success';
         } catch (error) {
+            if (response && response.status === 419) {
+                try {
+                    submissionToken.value = await fetchToken(form);
+                } catch (tokenError) {
+                    submissionToken.value = '';
+                }
+            }
+
             status.textContent = error instanceof SyntaxError
-                ? 'Сервер повернув некоректну відповідь. Спробуйте пізніше.'
-                : (error.message || 'Помилка з’єднання. Спробуйте ще раз.');
+                ? messages.invalidResponse
+                : (error.message || messages.error);
             status.dataset.state = 'error';
         } finally {
             button.disabled = false;
         }
-    }
-
-    function init() {
-        document.querySelectorAll('[data-jforms-form]').forEach(function (form) {
-            form.addEventListener('submit', submitForm);
-        });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init, { once: true });
-    } else {
-        init();
-    }
-})();
+    });
+}());

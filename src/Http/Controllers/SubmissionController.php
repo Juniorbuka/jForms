@@ -9,6 +9,15 @@ use Jevo\JForms\SubmissionService;
 
 class SubmissionController
 {
+    public function token(string $form, SubmissionService $submissions): JsonResponse
+    {
+        $submissions->form($form);
+
+        return response()->json(['token' => $submissions->issueToken($form)], 200, [
+            'Cache-Control' => 'no-store, private',
+        ]);
+    }
+
     public function store(Request $request, string $form, SubmissionService $submissions): JsonResponse|RedirectResponse
     {
         $expectsJson = $request->isJson() || $request->expectsJson();

@@ -2,6 +2,7 @@
 
 namespace Jevo\JForms;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -10,6 +11,15 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SubmissionService
 {
+    public function issueToken(string $formKey): string
+    {
+        $tokenId = $this->uuidV4();
+        $issuedAt = time();
+        $signature = hash_hmac('sha256', $this->tokenPayload($formKey, $tokenId, $issuedAt), $this->applicationKey());
+
+        return $tokenId . '.' . $issuedAt . '.' . $signature;
+    }
+
     /** @return array<string, mixed> */
     public function submit(string $formKey, array $input, string $ip): array
     {
@@ -64,6 +74,23 @@ class SubmissionService
             throw new HttpException(422, 'Unable to process this submission.');
         }
 
+        $submissionToken = $input['_jforms_token'] ?? null;
+        if (!is_string($submissionToken) || !preg_match('/^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.([0-9]{10})\.([a-f0-9]{64})$/i', $submissionToken, $tokenParts)) {
+            throw new HttpException(422, 'A valid form token is required. Reload the form and try again.');
+        }
+        $tokenId = strtolower($tokenParts[1]);
+        $issuedAt = (int) $tokenParts[2];
+        $canonicalToken = $tokenId . '.' . $issuedAt . '.' . strtolower($tokenParts[3]);
+        $ttlSeconds = min(86400, max(60, (int) ($options['token_ttl_seconds'] ?? 3600)));
+        $expectedSignature = hash_hmac('sha256', $this->tokenPayload($formKey, $tokenId, $issuedAt), $this->applicationKey());
+        if ($issuedAt > time() || time() - $issuedAt > $ttlSeconds || !hash_equals($expectedSignature, strtolower($tokenParts[3]))) {
+            throw new HttpException(419, 'The form token is invalid or expired. Reload the form and try again.');
+        }
+        $tokenHash = hash('sha256', $canonicalToken);
+        if (DB::table('jforms_responses')->where('form_key', $formKey)->where('submission_token_hash', $tokenHash)->exists()) {
+            throw new HttpException(419, 'This form token has already been used. Reload the form and try again.');
+        }
+
         $allowed = array_keys($rules);
         $submitted = array_intersect_key($input, array_flip($allowed));
         $validator = Validator::make($submitted, $rules, (array) ($options['messages'] ?? []));
@@ -81,13 +108,22 @@ class SubmissionService
         $response = [
             'form_key' => $formKey,
             'form_name' => $formName,
+            'submission_token_hash' => $tokenHash,
             'data' => json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ];
-        DB::table('jforms_responses')->insert($response);
+        try {
+            DB::table('jforms_responses')->insert($response);
+        } catch (QueryException $exception) {
+            if (DB::table('jforms_responses')->where('form_key', $formKey)->where('submission_token_hash', $tokenHash)->exists()) {
+                throw new HttpException(419, 'This form token has already been used. Reload the form and try again.');
+            }
+            throw $exception;
+        }
 
         return [
             'message' => (string) ($options['success_message'] ?? 'Дякуємо! Дані надіслано.'),
+            'next_token' => $this->issueToken($formKey),
         ];
     }
 
@@ -105,6 +141,51 @@ class SubmissionService
             throw new HttpException(404);
         }
         return $forms[$formKey];
+    }
+
+    private function uuidV4(): string
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $hex = bin2hex($bytes);
+
+        return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' . substr($hex, 12, 4) . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20);
+    }
+
+    private function tokenPayload(string $formKey, string $tokenId, int $issuedAt): string
+    {
+        return implode('|', [$formKey, $tokenId, (string) $issuedAt]);
+    }
+
+    private function applicationKey(): string
+    {
+        $key = (string) config('app.key', '');
+        if (str_starts_with($key, 'base64:')) {
+            $decoded = base64_decode(substr($key, 7), true);
+            $key = $decoded === false ? '' : $decoded;
+        }
+
+        if ($key === '') {
+            $key = (string) config('jevo.jforms.token_secret', config('jforms.token_secret', ''));
+        }
+
+        if ($key === '') {
+            $databasePassword = (string) config('database.connections.default.password', '');
+            if ($databasePassword !== '') {
+                $key = hash('sha256', $databasePassword . '|' . (defined('EVO_CORE_PATH') ? EVO_CORE_PATH : 'evolution'));
+            } elseif (defined('EVO_CORE_PATH')) {
+                // Evolution CMS installations commonly do not define app.key.
+                // Keep token signing available, matching EvoUI's path-based fallback.
+                $key = hash('sha256', 'jevo.jforms|' . EVO_CORE_PATH);
+            }
+        }
+
+        if ($key === '') {
+            throw new HttpException(500, 'Configure jevo.jforms.token_secret to sign form tokens.');
+        }
+
+        return $key;
     }
 
 }

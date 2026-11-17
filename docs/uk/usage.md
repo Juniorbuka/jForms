@@ -10,6 +10,7 @@ jForms приймає відправлення форм, перевіряє їх
 php artisan package:installrequire jevo/jforms "^1.0"
 php artisan migrate
 php artisan vendor:publish --tag=jforms-config
+php artisan vendor:publish --tag=jforms-assets
 ```
 
 Файл конфігурації буде опубліковано сюди:
@@ -45,6 +46,7 @@ return [
                 'attempts' => 10,
                 'decay_seconds' => 60,
             ],
+            'token_ttl_seconds' => 3600,
         ],
     ],
 ];
@@ -62,6 +64,7 @@ return [
 | `rate_limit.attempts` | Кількість спроб з однієї IP-адреси для цієї форми за період. За замовчуванням — `10`. |
 | `rate_limit.decay_seconds` | Період обмеження у секундах. За замовчуванням — `60`; значення менші за `60` буде збільшено до `60`. |
 | `max_payload_bytes` | Максимальний розмір запиту у байтах. За замовчуванням — `16384` (16 КБ). |
+| `token_ttl_seconds` | Строк дії підписаного одноразового токена. За замовчуванням — `3600` секунд; дозволено від 60 секунд до 24 годин. |
 
 Працюють стандартні правила валідації Laravel. Поля, яких немає в `rules`, відкидаються, навіть якщо браузер їх надіслав. Якщо змінити `name`, попередні відповіді не зміняться: у них збережеться назва, яка була на момент відправлення.
 
@@ -70,8 +73,9 @@ return [
 Маршрут пакета приймає відправлення за адресою `POST /jforms/{form}`. JS надсилає JSON через AJAX; якщо JS не завантажився, HTML-форма також обробляється і повертає відвідувача на попередню сторінку. Вкажіть налаштований ключ форми й додайте CSRF-токен:
 
 ```blade
-<form id="appointment-form" data-jforms-form action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
+<form id="appointment-form" data-jforms-form data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}" action="{{ route('jForms.submit', ['form' => 'appointment']) }}" method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="{{ app(\Jevo\JForms\SubmissionService::class)->issueToken('appointment') }}">
     <label>
         Ім’я
         <input name="name" autocomplete="name" required maxlength="120">
@@ -112,18 +116,16 @@ return [
 
 ## 4. Надсилання через AJAX
 
-Підключіть JS-файл теми. Обробник jForms входить у `theme/js/forms.js` і збирається в `/theme/dist/js/forms.min.js`; він надсилає форму у форматі JSON із CSRF-токеном і показує результат у `[data-jforms-status]`:
+Опублікуйте JS-файл командою `php artisan vendor:publish --tag=jforms-assets`. Вихідний код — `resources/js/jforms.js`, стиснена версія — `resources/js/jforms.min.js`. Якщо Blade-шаблон містить форму з атрибутом `data-jforms-form`, пакет автоматично додає скрипт `/assets/modules/jforms/jforms.min.js`; вручну підключати його не потрібно. Скрипт не залежить від теми чи jQuery; перед відправленням отримує свіжий `_jforms_token`, надсилає JSON із CSRF-токеном і показує результат у `[data-jforms-status]`:
 
 ```blade
 <p id="appointment-status" data-jforms-status role="status" aria-live="polite"></p>
-<script src="/theme/dist/js/forms.min.js" defer></script>
 ```
-
-Завантажуйте цей файл після jQuery та інших скриптів, від яких залежить тема.
 
 ## 5. Захист і відповіді сервера
 
 - **CSRF:** маршрут працює в middleware-групі `web`. Додайте `@csrf` і передавайте токен у заголовку `X-CSRF-TOKEN`.
+- **Одноразовий токен:** сервер підписує випадковий токен ключем програми, прив’язує його до ключа форми та строку дії. Після успішного збереження хеш токена записується в унікальне поле БД; повторне або паралельне використання відхиляється. Після успіху JS отримує наступний токен.
 - **AJAX:** JS надсилає `Content-Type: application/json` і `Accept: application/json`. Звичайне HTML-відправлення також підтримується як резервний варіант.
 - **Дозволені поля:** сервер перевіряє і зберігає лише поля, вказані у `rules`. Не формуйте правила чи назву форми з даних запиту.
 - **Валідація:** перед записом Laravel перевіряє значення та обрізає пробіли в рядках. Помилки повертаються у JSON зі статусом `422`.
@@ -135,7 +137,7 @@ return [
 
 Honeypot і обмеження частоти зменшують автоматизований спам, але не є CAPTCHA і не гарантують блокування всіх ботів.
 
-Якщо ключ форми не налаштований — `404`.
+Якщо ключ форми не налаштований — `404`. Прострочений або вже використаний `_jforms_token` повертає `419`; перезавантажте форму.
 
 ## 6. Валідація і збереження у власному контролері
 
@@ -171,6 +173,6 @@ return response()->json(['ok' => true] + $result, 201);
 
 - **Модуль повідомляє, що таблиці немає:** з каталогу сайту `core/` виконайте `php artisan migrate`, підключившись до тієї самої бази, що використовує сайт.
 - **Ключ форми повертає 404:** перевірте наявність ключа у `forms` файлу `core/custom/config/jevo/jforms.php`; якщо ввімкнений кеш конфігурації, очистіть його.
-- **Запит повертає 419:** перевірте CSRF-токен і переконайтеся, що POST-маршрут працює в middleware `web`.
+- **Запит повертає 419:** перевірте CSRF-токен і строк дії `_jforms_token`; оновіть сторінку та переконайтеся, що POST-маршрут працює в middleware `web`.
 - **Після оновлення пакета старий вигляд модуля:** з каталогу `core/` виконайте `php artisan view:clear`.
 

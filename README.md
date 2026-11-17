@@ -27,6 +27,7 @@ To publish the default configuration to `core/custom/config/jevo/jforms.php`:
 
 ```sh
 php artisan vendor:publish --tag=jforms-config
+php artisan vendor:publish --tag=jforms-assets
 ```
 
 File uploads are not supported.
@@ -67,14 +68,16 @@ Route::middleware('web')->post('/appointment', function (Request $request, Submi
 
 ## Blade form and AJAX
 
-Register the form in `core/custom/config/jevo/jforms.php`, then use the package routes and JavaScript asset:
+Register the form in `core/custom/config/jevo/jforms.php`, then use the package routes. The package adds its JavaScript tag automatically when it compiles a Blade template containing `data-jforms-form`:
 
 ```blade
 <form id="appointment-form"
       data-jforms-form
+      data-jforms-token-url="{{ route('jForms.token', ['form' => 'appointment']) }}"
       action="{{ route('jForms.submit', ['form' => 'appointment']) }}"
       method="post">
     @csrf
+    <input type="hidden" name="_jforms_token" value="{{ app(\Jevo\JForms\SubmissionService::class)->issueToken('appointment') }}">
     <input type="tel" name="phone" required>
     <input type="email" name="email">
     <input type="text" name="child_name">
@@ -85,7 +88,7 @@ Register the form in `core/custom/config/jevo/jforms.php`, then use the package 
 <script src="/theme/dist/js/forms.min.js" defer></script>
 ```
 
-The jForms AJAX handler belongs to the site theme: keep it in `theme/js/forms.js`, build it to `/theme/dist/js/forms.min.js`, and include that bundle after jQuery.
+The jForms AJAX handler is included in the package at `resources/js/jforms.js` with a minified build at `resources/js/jforms.min.js`. Publish the asset with `php artisan vendor:publish --tag=jforms-assets`; the package injects `/assets/modules/jforms/jforms.min.js` into templates containing the form marker. It uses native browser APIs and does not depend on the theme bundle or jQuery. Before each submit, it fetches a fresh form token; the server validates its signature, expiry, and one-time use.
 
 ## License
 

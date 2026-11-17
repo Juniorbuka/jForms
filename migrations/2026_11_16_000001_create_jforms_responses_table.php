@@ -12,9 +12,11 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->string('form_key', 100)->index();
             $table->string('form_name', 190);
+            $table->char('submission_token_hash', 64)->nullable();
             $table->json('data');
             $table->timestamp('created_at')->useCurrent();
             $table->index(['form_key', 'created_at']);
+            $table->unique(['form_key', 'submission_token_hash'], 'jforms_submission_token_unique');
         });
     }
 
