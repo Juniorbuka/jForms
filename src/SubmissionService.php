@@ -4,6 +4,7 @@ namespace Jevo\JForms;
 
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -56,9 +57,21 @@ class SubmissionService
         $decaySeconds = max(60, (int) ($options['rate_limit']['decay_seconds'] ?? 60));
 
         if (RateLimiter::tooManyAttempts($limitKey, $maxAttempts)) {
+            Log::warning('jForms: per-IP rate limit exceeded', ['form' => $formKey, 'ip' => $ip]);
             throw new HttpException(429, 'Too many submissions. Please try again later.');
         }
         RateLimiter::hit($limitKey, $decaySeconds);
+
+        $globalAttempts = (int) ($options['rate_limit']['global_attempts'] ?? 120);
+        $globalDecay = max(60, (int) ($options['rate_limit']['global_decay_seconds'] ?? 60));
+        if ($globalAttempts > 0) {
+            $globalLimitKey = 'jforms:v2:global:' . $formKey;
+            if (RateLimiter::tooManyAttempts($globalLimitKey, $globalAttempts)) {
+                Log::warning('jForms: global rate limit exceeded', ['form' => $formKey, 'ip' => $ip]);
+                throw new HttpException(429, 'Service temporarily busy. Please try again later.');
+            }
+            RateLimiter::hit($globalLimitKey, $globalDecay);
+        }
 
         $maxPayloadBytes = max(1024, (int) ($options['max_payload_bytes'] ?? 16384));
         $encodedInput = json_encode($input);
@@ -68,9 +81,16 @@ class SubmissionService
 
         $honeypot = (string) ($options['honeypot'] ?? 'website');
         if ($honeypot !== '' && (!array_key_exists($honeypot, $input) || (is_scalar($input[$honeypot]) && trim((string) $input[$honeypot]) !== ''))) {
+            Log::warning('jForms: honeypot triggered', [
+                'form' => $formKey,
+                'ip' => $ip,
+                'field' => $honeypot,
+                'value' => is_scalar($input[$honeypot] ?? null) ? (string) $input[$honeypot] : '[non-scalar]',
+            ]);
             throw new HttpException(422, 'Unable to process this submission.');
         }
         if ($honeypot !== '' && !is_scalar($input[$honeypot])) {
+            Log::warning('jForms: honeypot non-scalar input', ['form' => $formKey, 'ip' => $ip, 'field' => $honeypot]);
             throw new HttpException(422, 'Unable to process this submission.');
         }
 
@@ -86,6 +106,18 @@ class SubmissionService
         if ($issuedAt > time() || time() - $issuedAt > $ttlSeconds || !hash_equals($expectedSignature, strtolower($tokenParts[3]))) {
             throw new HttpException(419, 'The form token is invalid or expired. Reload the form and try again.');
         }
+
+        $minSeconds = max(0, (int) ($options['min_seconds'] ?? 0));
+        if ($minSeconds > 0 && (time() - $issuedAt) < $minSeconds) {
+            Log::warning('jForms: form submitted too quickly (anti-bot triggered)', [
+                'form' => $formKey,
+                'ip' => $ip,
+                'elapsed_seconds' => time() - $issuedAt,
+                'min_seconds' => $minSeconds,
+            ]);
+            throw new HttpException(422, 'Form submitted too quickly. Please wait a moment and try again.');
+        }
+
         $tokenHash = hash('sha256', $canonicalToken);
         if (DB::table('jforms_responses')->where('form_key', $formKey)->where('submission_token_hash', $tokenHash)->exists()) {
             throw new HttpException(419, 'This form token has already been used. Reload the form and try again.');
@@ -101,7 +133,7 @@ class SubmissionService
         $data = $validator->validated();
         foreach ($data as $key => $value) {
             if (is_string($value)) {
-                $data[$key] = trim($value);
+                $data[$key] = strip_tags(trim($value));
             }
         }
 
@@ -178,6 +210,14 @@ class SubmissionService
                 // Evolution CMS installations commonly do not define app.key.
                 // Keep token signing available, matching EvoUI's path-based fallback.
                 $key = hash('sha256', 'jevo.jforms|' . EVO_CORE_PATH);
+            }
+
+            if ($key !== '') {
+                static $secretWarned = false;
+                if (!$secretWarned) {
+                    Log::warning('jForms: app.key and jevo.jforms.token_secret are not set. Token signing uses a fallback secret.');
+                    $secretWarned = true;
+                }
             }
         }
 

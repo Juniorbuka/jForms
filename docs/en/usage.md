@@ -62,7 +62,9 @@ Available settings:
 | `messages` | Optional Laravel validation messages, such as `phone.required`. |
 | `honeypot` | Name of the hidden anti-bot field. Defaults to `website`. |
 | `rate_limit.attempts` | Number of allowed attempts per IP address and form during the time window. Defaults to `10`. |
-| `rate_limit.decay_seconds` | Rate-limit window in seconds. Defaults to `60`; values below `60` are raised to `60`. |
+| `rate_limit.decay_seconds` | Rate-limit window in seconds for per-IP limit. Defaults to `60`; values below `60` are raised to `60`. |
+| `rate_limit.global_attempts` | Maximum total attempts across all IPs combined. Defaults to `120`. |
+| `rate_limit.global_decay_seconds` | Window length in seconds for global limit. Defaults to `60`. |
 | `max_payload_bytes` | Maximum request size in bytes. Defaults to `16384` (16 KB). |
 | `token_ttl_seconds` | Lifetime of the signed one-time token. Defaults to `3600` seconds; allowed range is 60 seconds to 24 hours. |
 

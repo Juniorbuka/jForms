@@ -33,6 +33,19 @@
         return result.token;
     }
 
+    document.addEventListener('focusin', function (event) {
+        var target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        var form = target.closest('form[data-jforms-form]');
+        if (!form) return;
+        var tokenInput = form.querySelector('[name="_jforms_token"]');
+        if (tokenInput && !tokenInput.value && form.dataset.jformsTokenUrl) {
+            fetchToken(form).then(function (token) {
+                if (token && !tokenInput.value) tokenInput.value = token;
+            }).catch(function () {});
+        }
+    }, true);
+
     document.addEventListener('submit', async function (event) {
         var form = event.target;
         if (!(form instanceof HTMLFormElement) || !form.matches('[data-jforms-form]')) return;
@@ -52,7 +65,9 @@
 
         var response;
         try {
-            submissionToken.value = await fetchToken(form);
+            if (!submissionToken.value) {
+                submissionToken.value = await fetchToken(form);
+            }
             response = await fetch(form.action, {
                 method: 'POST',
                 headers: {

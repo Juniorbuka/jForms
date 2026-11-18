@@ -12,6 +12,8 @@ class ModuleController
 {
     public function index()
     {
+        $this->ensureAuthorized();
+
         $responses = DB::table('jforms_responses')
             ->select('form_key', 'form_name', DB::raw('COUNT(*) as total'), DB::raw('MAX(created_at) as latest'))
             ->groupBy('form_key', 'form_name')
@@ -23,6 +25,8 @@ class ModuleController
 
     public function show(Request $request, string $form)
     {
+        $this->ensureAuthorized();
+
         $validator = Validator::make($request->all(), [
             'q' => ['nullable', 'string', 'max:100'],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
@@ -52,6 +56,8 @@ class ModuleController
 
     public function response(string $form, int $response)
     {
+        $this->ensureAuthorized();
+
         $result = DB::table('jforms_responses')
             ->where('form_key', $form)
             ->where('id', $response)
@@ -67,6 +73,8 @@ class ModuleController
 
     public function destroy(Request $request, int $id)
     {
+        $this->ensureAuthorized();
+
         $response = DB::table('jforms_responses')->where('id', $id)->first();
         if (!$response) {
             throw new HttpException(404);
@@ -81,6 +89,8 @@ class ModuleController
 
     public function bulkDestroy(Request $request, string $form)
     {
+        $this->ensureAuthorized();
+
         $validator = Validator::make($request->all(), [
             'ids' => ['required', 'array', 'min:1'],
             'ids.*' => ['required', 'integer', 'distinct'],
@@ -116,5 +126,12 @@ class ModuleController
         }
 
         return view('jForms::module.' . $surface . $view, $data);
+    }
+
+    private function ensureAuthorized(): void
+    {
+        if (!function_exists('evo') || !evo()->hasPermission('exec_module')) {
+            throw new HttpException(403, 'Access denied.');
+        }
     }
 }
